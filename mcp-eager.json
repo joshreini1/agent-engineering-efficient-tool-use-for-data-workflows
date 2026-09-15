@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "data": {
+      "command": "node",
+      "args": ["REPO_ROOT/tools/naive-server.js"],
+      "env": {
+        "DBT_PROJECT_DIR": "REPO_ROOT/workspace",
+        "SNOWFLAKE_CONNECTION": "${SNOWFLAKE_CONNECTION:-DEVREL_ENTERPRISE}",
+        "SNOWFLAKE_ROLE": "${SNOWFLAKE_ROLE:-DLAI_LAB_RL}",
+        "SNOWFLAKE_WAREHOUSE": "${SNOWFLAKE_WAREHOUSE:-DLAI_LAB_WH}"
+      }
+    }
+  }
+}

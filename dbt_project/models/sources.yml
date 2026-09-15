@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: retail
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'DLAI_AGENT_ENGINEERING') }}"
+    schema: "{{ env_var('SNOWFLAKE_TARGET_SCHEMA') }}"
+    tables:
+      - name: fct_sales
+        description: Order line grain sales fact, one row per order line.
+      - name: order_payments
+        description: Payment records captured against orders.
+      - name: dim_exchange_rates
+        description: Daily currency conversion rates.

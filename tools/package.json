@@ -1,0 +1,12 @@
+{
+  "name": "dlai-lesson-2-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.0"
+  }
+}

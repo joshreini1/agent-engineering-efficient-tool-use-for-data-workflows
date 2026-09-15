@@ -1,0 +1,11 @@
+---
+description: Grade a data-eng-bench task row by row against its governed definition
+argument-hint: --<task-name>
+allowed-tools: Bash
+---
+
+!`task=$(printf '%s' "$ARGUMENTS" | awk '{print $1}' | sed 's/^--*//'); for c in ro_shared_data/lab/verifiers ../ro_shared_data/lab/verifiers verifiers ../verifiers; do [ -d "$c" ] && { dir="$c"; break; }; done; if [ -z "${dir:-}" ]; then echo "result: unavailable"; echo "reason: no verifiers directory found from $PWD"; elif [ -z "$task" ] && [ "$(ls "$dir"/*.sql 2>/dev/null | wc -l | tr -d ' ')" != "1" ]; then echo "result: unavailable"; echo "reason: name the task, for example /correctness --exchange-rate-settlement-date"; echo "available:"; ls "$dir"/*.sql 2>/dev/null | sed 's|.*/||;s|\.sql$||;s|^|  |'; else [ -z "$task" ] && f=$(ls "$dir"/*.sql) || f="$dir/$task.sql"; if [ ! -f "$f" ]; then echo "result: unavailable"; echo "reason: no verifier for task '$task'"; echo "available:"; ls "$dir"/*.sql 2>/dev/null | sed 's|.*/||;s|\.sql$||;s|^|  |'; else echo "task: $(basename "$f" .sql)"; uvx --from snowflake-cli snow sql -c "${SNOWFLAKE_CONNECTION:-DEVREL_ENTERPRISE}" -f "$f" --format json 2>&1 | python3 -c 'import json,sys; raw=sys.stdin.read(); d=json.loads(raw) if raw.lstrip().startswith("[") else []; flat=[x for e in d for x in (e if isinstance(e,list) else [e]) if isinstance(x,dict)]; g=[r for r in flat if "RESULT" in r]; r=g[-1] if g else None; low=raw.lower(); [print(k.lower().replace("_"," ")+": "+str(v)) for k,v in r.items()] if r else [print("result: unavailable"), print("reason: "+("the verifier could not read the output table, check the role grants" if ("not authorized" in low or "insufficient privileges" in low) else "the output table is not built yet or is missing required columns"))]; [print("  "+l) for l in raw.strip().splitlines()[:4]] if not r else None; print("note: some rows were converted at the order-date rate, not the settlement-date rate") if r and r.get("FX_DATE_VIOLATIONS",0)>0 else None'; fi; fi; true`
+
+Output the block above exactly as it is, and nothing else. No preamble, no headings, no
+commentary, no reformatting, no observations about the numbers. Do not edit files, do not
+run dbt, and do not attempt a fix.

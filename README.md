@@ -1,0 +1,235 @@
+# Efficient Tool Use for Coding Agents
+
+Enterprise data platforms expose hundreds of capabilities. Loading every tool
+definition at startup consumes context before the agent reads the task. Large
+SQL results consume context after the agent calls a tool. Both pressures grow
+with session length.
+
+This lab demonstrates three levers that reduce token spend while maintaining
+quality, using a real dbt task against Snowflake data.
+
+## The three levers
+
+| Lever | What it does | Implementation |
+|---|---|---|
+| **Tool search** | Defers tool schemas; agent discovers on demand | `search_tools` + `invoke_tool` in `tools/server.js` |
+| **Output compaction** | Lossless compression: TSV encoding + constant-column preamble | `compactResult` in `tools/lib.js` |
+| **Result offloading** | Stores oversized results locally; only a preview enters context | `offloadLargeResult` in `tools/lib.js` |
+
+### Scale of the problem
+
+The Anthropic blog documents the scaling problem: five MCP servers (GitHub,
+Slack, Sentry, Grafana, Splunk) consume ~55K tokens of tool definitions before
+the conversation starts. Only 2-3 tools are needed for any given task.
+
+## Prerequisites
+
+- A Snowflake account with the lab data provisioned (see `setup/`)
+- Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
+- Node.js 18+
+- A Snowflake Cortex PAT or Anthropic API key
+
+## One-time setup
+
+```bash
+# 1. Install MCP server dependencies
+npm install --prefix tools
+
+# 2. Set your credentials
+export SNOWFLAKE_ACCOUNT=<your-account>
+export SNOWFLAKE_USER=<your-user>
+export SNOWFLAKE_CONNECTION=<your-snow-cli-connection>
+export ANTHROPIC_BASE_URL=<your-endpoint>
+export ANTHROPIC_API_KEY=<your-key>
+export ANTHROPIC_AUTH_TOKEN="$ANTHROPIC_API_KEY"
+export ANTHROPIC_MODEL=claude-opus-4-6
+
+# 3. Wire up Snowflake and dbt
+source lab/env.sh
+```
+
+## Stage 1: See the scaling problem
+
+Reset the workspace and copy the naive (30 eager tools) MCP config:
+
+```bash
+lab/reset.sh
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/naive-server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+Run `/mcp`. This server exposes 30 tool definitions at startup. Ask the agent to
+list the available data-engineering capabilities, then `/exit`.
+
+Now replace with the efficient catalog:
+
+```bash
+cd ..
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+Run `/mcp` again. Two tools (`search_tools` and `invoke_tool`), same 30-capability
+catalog. This is **lever 1: tool search**. `/exit`.
+
+## Stage 2: Run the task with the naive catalog
+
+```bash
+cd ..
+lab/reset.sh
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/naive-server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+Paste the task from `prompts/task.md`. After the agent finishes:
+
+```
+/correctness --exchange-rate-settlement-date
+/cost
+```
+
+Record the correctness and cost. `/exit`.
+
+## Stage 3: Understand and apply the efficiency levers
+
+### Lever 1: Tool search (deferred discovery)
+
+Open `tools/server.js`. The server registers only two MCP schemas:
+
+```javascript
+server.tool("search_tools", ...);   // keyword search over the 30-tool catalog
+server.tool("invoke_tool", ...);    // dispatch to one implemented tool by name
+```
+
+The full catalog lives in `tools/catalog.js` (30 entries, 8 categories). The
+client loads two tool definitions. The agent calls `search_tools` first to find
+what it needs, then `invoke_tool` to run it.
+
+### Lever 2: Output compaction (lossless compression)
+
+Open `tools/lib.js` and find `compactResult`. Both levers are applied automatically
+inside `executeQuery`:
+
+```javascript
+export async function executeQuery(sql, options = {}) {
+  // ... run SQL via snow sql --format JSON ...
+  const { inlineRows, artifact, truncated } = await offloadLargeResult(...);
+  const { preamble, tsv } = compactResult(columns, inlineRows);
+  return { ..., preamble, tsv };
+}
+```
+
+`compactResult` applies two lossless transformations:
+
+```javascript
+export function compactResult(columns, rows) {
+  // 1. Constant-column preamble: columns with the same value in every row
+  //    are stated once and removed from the row body.
+  // 2. TSV encoding: tab-separated, no Markdown padding.
+  return { preamble, tsv: `${header}\n${body}` };
+}
+```
+
+### Lever 3: Intermediate result offloading
+
+`offloadLargeResult` decides whether the full result fits inline (up to 20 rows /
+6 KB) or must be written to disk:
+
+```javascript
+export async function offloadLargeResult(sql, rows, columns, rawChars) {
+  const mustOffload = rows.length > maxInlineRows || ...;
+  if (mustOffload) {
+    await writeFile(".tool-results/query-<timestamp>.json", ...);
+  }
+  return { inlineRows: mustOffload ? sample.slice(0, 5) : sample, artifact };
+}
+```
+
+### Try each lever interactively
+
+```bash
+cd ..
+lab/reset.sh
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+**Lever 1 -- tool search.** Ask: `Search the MCP tool catalog for "dbt"`
+
+**Lever 2 -- output compaction.** Ask:
+```
+Run this SQL: SELECT 'USD' AS TO_CURRENCY, FROM_CURRENCY, RATE FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES WHERE RATE_DATE = '2024-01-02' LIMIT 10
+```
+Look for the `preamble` (TO_CURRENCY stated once) and TSV body (no padding).
+
+**Lever 3 -- result offloading.** Ask:
+```
+Run this SQL: SELECT * FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES
+```
+Look for `truncated: true`, 5-row preview, and the `.tool-results/` artifact path.
+
+`/exit` when done.
+
+### Run the full task
+
+```bash
+cd ..
+lab/reset.sh
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+Paste the same task. After the agent finishes:
+
+```
+/correctness --exchange-rate-settlement-date
+/cost
+```
+
+Check offloaded files: `ls .tool-results/`
+
+## Expected results
+
+| | Naive (30 eager tools) | Efficient (search + compaction) |
+|---|---|---|
+| Correct | PASS (340 rows) | PASS (340 rows) |
+| Cost | ~$2.64 | ~$2.37 (10% less) |
+
+Agents are stochastic. One run is a directional signal, not a rigorous comparison.
+
+## What transfers
+
+| Lever | Portable principle |
+|---|---|
+| Tool search | MCP catalog pattern works with any MCP client |
+| Output compaction | Lossless; replace format for any SQL backend |
+| Result offloading | Keep oversized data out of context; mechanism varies |
+
+A fourth lever, **bundled dispatch (Programmatic Tool Calling)**, bundles multiple
+tool calls into a single code-execution turn. PTC requires harness-level support
+and is available in CoCo and the Anthropic API, but not in Claude Code CLI.
+
+## References
+
+- [Intelligence Efficiency in CoCo and CoWork](https://www.snowflake.com/en/blog/engineering/snowflake-coco-cowork-token-spend-efficiency/) -- Snowflake AI Research, Aug 2026
+- [Introducing advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) -- Anthropic, Nov 2025
+
+## Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| `/mcp` shows no tools | a relative path in `.mcp.json`, or you launched from the wrong directory |
+| the agent cannot authenticate to Snowflake | you did not `source lab/env.sh` before launching |
+| `/correctness` says FACT_REVENUE is not built | the agent never completed a successful dbt build |
+| the reset counts are not 9456 / 1973 / 13242 | the source data is wrong; run `setup/verify_setup.sh` |
+| `Auth conflict` | you launched without `--setting-sources project,local` |

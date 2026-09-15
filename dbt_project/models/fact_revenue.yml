@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: fact_revenue
+    description: Daily revenue aggregation with USD conversion for finance reporting.
+    columns:
+      - name: order_date
+        tests: [not_null]
+      - name: settlement_date
+        tests: [not_null]
+      - name: source_system
+        tests: [not_null]
+      - name: fx_rate
+        tests: [not_null]

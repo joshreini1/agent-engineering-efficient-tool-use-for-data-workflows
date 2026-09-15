@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "deny": [
+      "WebSearch",
+      "WebFetch"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "data"
+  ]
+}

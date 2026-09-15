@@ -1,0 +1,14 @@
+dlai_agent_engineering_l2:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      authenticator: "{{ env_var('SNOWFLAKE_AUTHENTICATOR', 'snowflake') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', '') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'DLAI_LAB_RL') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'DLAI_AGENT_ENGINEERING') }}"
+      schema: "{{ env_var('SNOWFLAKE_TARGET_SCHEMA') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'DLAI_LAB_WH') }}"
+      threads: 2
