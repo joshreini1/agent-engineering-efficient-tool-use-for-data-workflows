@@ -18,7 +18,7 @@ quality, using a real dbt task against Snowflake data.
 
 ### Scale of the problem
 
-The Anthropic blog documents the scaling problem: five MCP servers (GitHub,
+The Anthropic blog ["Introducing advanced tool use"](https://www.anthropic.com/engineering/advanced-tool-use) documents the scaling problem: five MCP servers (GitHub,
 Slack, Sentry, Grafana, Splunk) consume ~55K tokens of tool definitions before
 the conversation starts. Only 2-3 tools are needed for any given task.
 
