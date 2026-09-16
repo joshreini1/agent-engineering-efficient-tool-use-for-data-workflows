@@ -309,6 +309,40 @@ A fourth lever, **bundled dispatch (Programmatic Tool Calling)**, bundles multip
 tool calls into a single code-execution turn. PTC requires harness-level support
 and is available in CoCo and the Anthropic API, but not in Claude Code CLI.
 
+## These efficiencies -- and more -- are built into Snowflake CoCo
+
+[Snowflake CoCo](https://www.snowflake.com/en/product/snowflake-coco/) (formerly Cortex Code) is Snowflake's data-native AI coding agent. The levers in this lab -- tool search, output compaction, result offloading -- are production features in CoCo's harness, along with additional optimizations like bundled dispatch (PTC), sidecar-based skill loading, and automatic context management.
+
+The result is a shifted cost-quality frontier: a smaller model on CoCo matches or beats a larger model on a conventional harness.
+
+### Cost-quality frontier (from [Snowflake AI Research, Aug 2026](https://www.snowflake.com/en/blog/engineering/snowflake-coco-cowork-token-spend-efficiency/))
+
+**SQL-fixing benchmark** (Pass3 over three trials):
+
+| Harness | Model | Pass3 | Cost/trial |
+|---|---|---|---|
+| **Snowflake CoCo** | Opus 5 | **98%** | $0.40 |
+| **Snowflake CoCo** | Sonnet 5 | **86%** | $0.30 |
+| Claude Code | Opus 5 | 72% | $0.45 |
+| Claude Code | Sonnet 5 | 44% | $0.15 |
+
+CoCo on Sonnet 5 outperforms Claude Code on Opus 5 -- a smaller model on the stronger harness -- with 86% vs 72% reliability at 33% lower cost.
+
+**General Snowflake workloads** (Pass3 over three trials):
+
+| Harness | Model | Pass3 | Cost/trial |
+|---|---|---|---|
+| **Snowflake CoCo** | Opus 5 | **68%** | $1.26 |
+| **Snowflake CoCo** | Sonnet 5 | **60%** | $0.45 |
+| Claude Code | Opus 5 | 58% | $0.82 |
+| Claude Code | Sonnet 5 | 48% | $0.29 |
+
+CoCo on Sonnet 5 matches Claude Code on Opus 5 reliability (60% vs 58%) at 45% lower cost per trial.
+
+### Try CoCo
+
+Sign up for a free trial at [signup.snowflake.com/cortex-code](https://signup.snowflake.com/cortex-code) -- includes 30 days of free credits. CoCo is available as a CLI, desktop app, in Snowsight, and as a VS Code extension.
+
 ## References
 
 - [Intelligence Efficiency in CoCo and CoWork](https://www.snowflake.com/en/blog/engineering/snowflake-coco-cowork-token-spend-efficiency/) -- Snowflake AI Research, Aug 2026
