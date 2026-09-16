@@ -315,7 +315,13 @@ and is available in CoCo and the Anthropic API, but not in Claude Code CLI.
 
 The result is a shifted cost-quality frontier: a smaller model on CoCo matches or beats a larger model on a conventional harness.
 
-### Cost-quality frontier (from [Snowflake AI Research, Aug 2026](https://www.snowflake.com/en/blog/engineering/snowflake-coco-cowork-token-spend-efficiency/))
+<p align="center">
+  <img src="https://www.snowflake.com/adobe/dynamicmedia/deliver/dm-aid--e1443c2c-1528-442a-830a-42f145760cdd/figure-1.-introducing-data-eng-bench--why-you-need-data-native-harnesses-for-data-engineering.png?preferwebp=true&quality=85&width=960" alt="Quality vs cost per trial by harness and model on data-eng-bench" width="720" />
+</p>
+
+<p align="center"><em>Quality vs cost per trial on <a href="https://github.com/Snowflake-Labs/data-eng-bench">data-eng-bench</a> (up-and-left is better). From <a href="https://www.snowflake.com/en/blog/engineering/data-eng-bench-data-engineering-agent-benchmark/">Snowflake AI Research, Aug 2026</a>.</em></p>
+
+### Cost-quality frontier
 
 **SQL-fixing benchmark** (Pass3 over three trials):
 
