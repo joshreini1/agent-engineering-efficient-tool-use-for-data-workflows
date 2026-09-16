@@ -24,10 +24,14 @@ the conversation starts. Only 2-3 tools are needed for any given task.
 
 ## Prerequisites
 
-- A Snowflake account with the lab data provisioned (see `setup/`)
 - Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
 - Node.js 18+
-- A Snowflake Cortex PAT or Anthropic API key
+- One of these model backends:
+  - A Snowflake account with Cortex enabled (uses a PAT for both model inference and data)
+  - An Anthropic API key (you still need Snowflake or DuckDB for the data)
+- One of these data backends:
+  - A Snowflake account with the lab data provisioned (see `setup/`)
+  - DuckDB with the data-eng-bench retail dataset (see "Running with DuckDB" below)
 
 ## One-time setup
 
@@ -36,16 +40,34 @@ the conversation starts. Only 2-3 tools are needed for any given task.
 npm install --prefix tools
 
 # 2. Set your credentials
+source lab/env.sh
+```
+
+### Option A: Snowflake Cortex (model + data)
+
+```bash
 export SNOWFLAKE_ACCOUNT=<your-account>
 export SNOWFLAKE_USER=<your-user>
 export SNOWFLAKE_CONNECTION=<your-snow-cli-connection>
-export ANTHROPIC_BASE_URL=<your-endpoint>
-export ANTHROPIC_API_KEY=<your-key>
+export ANTHROPIC_BASE_URL="https://<account-url>.snowflakecomputing.com/api/v2/cortex"
+export ANTHROPIC_API_KEY=<your Snowflake Cortex PAT>
 export ANTHROPIC_AUTH_TOKEN="$ANTHROPIC_API_KEY"
 export ANTHROPIC_MODEL=claude-opus-4-6
-
-# 3. Wire up Snowflake and dbt
 source lab/env.sh
+```
+
+### Option B: Anthropic API (model) + Snowflake (data)
+
+```bash
+export SNOWFLAKE_ACCOUNT=<your-account>
+export SNOWFLAKE_USER=<your-user>
+export SNOWFLAKE_CONNECTION=<your-snow-cli-connection>
+export ANTHROPIC_API_KEY=<your Anthropic API key>
+export ANTHROPIC_MODEL=claude-sonnet-4-5  # or any model on your account
+source lab/env.sh
+```
+
+No `ANTHROPIC_BASE_URL` needed -- Claude Code uses the Anthropic API by default.
 ```
 
 ## Stage 1: See the scaling problem
@@ -291,6 +313,30 @@ and is available in CoCo and the Anthropic API, but not in Claude Code CLI.
 
 - [Intelligence Efficiency in CoCo and CoWork](https://www.snowflake.com/en/blog/engineering/snowflake-coco-cowork-token-spend-efficiency/) -- Snowflake AI Research, Aug 2026
 - [Introducing advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) -- Anthropic, Nov 2025
+
+## Running with DuckDB (no Snowflake account needed)
+
+The task and data come from [data-eng-bench](https://github.com/Snowflake-Labs/data-eng-bench),
+which supports both Snowflake and DuckDB.
+
+1. Clone data-eng-bench and pull the DuckDB fixture:
+   ```bash
+   git clone https://github.com/Snowflake-Labs/data-eng-bench
+   cd data-eng-bench && git lfs pull --include base-image/database/retail.duckdb
+   ```
+
+2. The DuckDB file contains `FCT_SALES`, `ORDER_PAYMENTS`, and `DIM_EXCHANGE_RATES`
+   with identical data. Point dbt at DuckDB using `dbt-duckdb` instead of
+   `dbt-snowflake`, and update `dbt_project/profiles.yml` to use a DuckDB connection.
+
+3. Replace the SQL executor in `tools/lib.js`: change the `snow sql` subprocess call
+   to `duckdb retail.duckdb -json`. The `compactResult` and `offloadLargeResult`
+   functions work on parsed JSON rows regardless of the backend -- only the executor
+   changes.
+
+4. The `/correctness` verifier uses Snowflake SQL. Adapt the query in
+   `verifiers/exchange-rate-settlement-date.sql` to DuckDB syntax (minor difference:
+   `EQUAL_NULL` becomes `IS NOT DISTINCT FROM`).
 
 ## Troubleshooting
 
