@@ -35,6 +35,9 @@ the conversation starts. Only 2-3 tools are needed for any given task.
 
 ## One-time setup
 
+All commands below assume you are in the **repo root** (the directory containing
+`tools/`, `lab/`, `workspace/`, etc.).
+
 ```bash
 npm install --prefix tools
 ```
@@ -69,9 +72,10 @@ No `ANTHROPIC_BASE_URL` needed -- Claude Code uses the Anthropic API by default.
 
 ## Stage 1: See the scaling problem
 
-Reset the workspace and copy the naive (30 eager tools) MCP config:
+From the **repo root**, reset the workspace and start with the naive (30 eager tools) MCP config:
 
 ```bash
+# repo root
 lab/reset.sh
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/naive-server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
@@ -79,13 +83,15 @@ EOF
 cd workspace && claude --setting-sources project,local
 ```
 
-Run `/mcp`. This server exposes 30 tool definitions at startup. Ask the agent to
-list the available data-engineering capabilities, then `/exit`.
+You are now inside a Claude Code session (cwd: `workspace/`). Run `/mcp`. This
+server exposes 30 tool definitions at startup. Ask the agent to list the
+available data-engineering capabilities, then `/exit`.
 
-Now replace with the efficient catalog:
+Back in the terminal (cwd: `workspace/`), return to the repo root and switch to
+the efficient catalog:
 
 ```bash
-cd ..
+cd ..   # back to repo root
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
 EOF
@@ -97,8 +103,10 @@ catalog. This is **lever 1: tool search**. `/exit`.
 
 ## Stage 2: Run the task with the naive catalog
 
+From the **repo root** (run `cd ..` if you are still in `workspace/`):
+
 ```bash
-cd ..
+# repo root
 lab/reset.sh
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/naive-server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
@@ -150,6 +158,9 @@ After the agent finishes:
 Record the correctness and cost. `/exit`.
 
 ## Stage 3: Understand and apply the efficiency levers
+
+This stage is a code walkthrough followed by interactive demos. Start by reading
+the source files from the **repo root** (run `cd ..` if still in `workspace/`).
 
 ### Lever 1: Tool search (deferred discovery)
 
@@ -206,8 +217,10 @@ export async function offloadLargeResult(sql, rows, columns, rawChars) {
 
 ### Try each lever interactively
 
+From the **repo root**:
+
 ```bash
-cd ..
+# repo root
 lab/reset.sh
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
@@ -233,8 +246,10 @@ Look for `truncated: true`, 5-row preview, and the `.tool-results/` artifact pat
 
 ### Run the full task
 
+`/exit` the interactive session, then from the **repo root** (`cd ..` if needed):
+
 ```bash
-cd ..
+# repo root
 lab/reset.sh
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
