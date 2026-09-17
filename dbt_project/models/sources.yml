@@ -2,8 +2,8 @@ version: 2
 
 sources:
   - name: retail
-    database: "{{ env_var('SNOWFLAKE_DATABASE', 'DLAI_AGENT_ENGINEERING') }}"
-    schema: "{{ env_var('SNOWFLAKE_TARGET_SCHEMA') }}"
+    database: DBT_BENCH_RETAIL
+    schema: MAIN
     tables:
       - name: fct_sales
         description: Order line grain sales fact, one row per order line.

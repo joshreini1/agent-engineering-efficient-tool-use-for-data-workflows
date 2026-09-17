@@ -30,7 +30,7 @@ the conversation starts. Only 2-3 tools are needed for any given task.
   - A Snowflake account with Cortex enabled (uses a PAT for both model inference and data)
   - An Anthropic API key (you still need Snowflake or DuckDB for the data)
 - One of these data backends:
-  - A Snowflake account with the lab data provisioned (see `setup/`)
+  - A Snowflake account with `DBT_BENCH_RETAIL` loaded from [data-eng-bench](https://github.com/Snowflake-Labs/data-eng-bench) (20 schemas, 3,000+ tables)
   - DuckDB with the data-eng-bench retail dataset (see "Running with DuckDB" below)
 
 ## One-time setup
@@ -254,7 +254,7 @@ export function compactResult(columns, rows) {
 **Try it.** In the same Claude Code session, ask:
 
 ```
-Run this SQL: SELECT 'USD' AS TO_CURRENCY, FROM_CURRENCY, RATE FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES WHERE RATE_DATE = '2024-01-02' LIMIT 10
+Run this SQL: SELECT 'USD' AS TO_CURRENCY, FROM_CURRENCY, RATE FROM DBT_BENCH_RETAIL.MAIN.DIM_EXCHANGE_RATES WHERE RATE_DATE = '2024-01-02' LIMIT 10
 ```
 
 Expand the tool result (ctrl+o in Claude Code). Look for `"preamble":
@@ -288,7 +288,7 @@ The full result is preserved on disk but never enters context.
 **Try it.** In the same session, ask:
 
 ```
-Run this SQL: SELECT * FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES
+Run this SQL: SELECT * FROM DBT_BENCH_RETAIL.MAIN.DIM_EXCHANGE_RATES
 ```
 
 Expand the tool result. Look for `"truncated": true`, a 5-row preview, and the
@@ -375,9 +375,15 @@ ls .tool-results/
 | | Naive (30 eager tools) | Efficient (search + compaction) |
 |---|---|---|
 | Correct | PASS (340 rows) | PASS (340 rows) |
-| Cost | ~$2.64 | ~$2.37 (10% less) |
+| Cost | ~$2.25 | ~$2.00 (11% less) |
+| Cache-read tokens | ~518k | ~288k (44% less) |
 
-Agents are stochastic. One run is a directional signal, not a rigorous comparison.
+The 44% drop in cache-read tokens shows the levers keeping less data in the
+conversation history. Prompt caching in Claude Code means those tokens are read
+at 1/10th the input price, which limits the dollar impact. The mechanisms are
+real -- the magnitude scales with session length, result size, and whether the
+harness supports bundled dispatch (PTC). See the CoCo section below for
+production-scale numbers.
 
 ## What transfers
 

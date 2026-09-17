@@ -3,8 +3,10 @@ before editing anything.
 
 - The Snowflake connection is already configured through environment variables
   and profiles.yml. Do not change the connection or authentication.
-- Database: DLAI_AGENT_ENGINEERING
-- Source schema: L1_FX_SOURCE (read-only fixtures)
+- Source database: DBT_BENCH_RETAIL (a large retail data warehouse with 20+
+  schemas and 3,000+ tables). You will need to explore the schemas and tables
+  to find the right source data.
+- Target database: DLAI_AGENT_ENGINEERING
 - Lab schema: L1_LAB (agent writes here)
 - Role: DLAI_LAB_RL
 - Warehouse: DLAI_LAB_WH
