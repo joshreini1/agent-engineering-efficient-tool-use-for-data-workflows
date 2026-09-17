@@ -35,12 +35,16 @@ the conversation starts. Only 2-3 tools are needed for any given task.
 
 ## One-time setup
 
+Clone the repo:
+
 ```bash
 git clone https://github.com/joshreini1/agent-engineering-efficient-tool-use-for-data-workflows.git
 cd agent-engineering-efficient-tool-use-for-data-workflows
 ```
 
 All commands below assume you are in this **repo root** directory.
+
+Install MCP server dependencies:
 
 ```bash
 npm install --prefix tools
@@ -58,6 +62,11 @@ export ANTHROPIC_BASE_URL="https://<account-url>.snowflakecomputing.com/api/v2/c
 export ANTHROPIC_AUTH_TOKEN=<your Snowflake Cortex PAT>
 unset ANTHROPIC_API_KEY   # avoid "Auth conflict" warning in Claude Code
 export ANTHROPIC_MODEL=claude-opus-4-6
+```
+
+Wire up Snowflake and dbt:
+
+```bash
 source lab/env.sh
 ```
 
@@ -69,39 +78,66 @@ export SNOWFLAKE_USER=<your-user>
 export SNOWFLAKE_CONNECTION=<your-snow-cli-connection>
 export ANTHROPIC_API_KEY=<your Anthropic API key>
 export ANTHROPIC_MODEL=claude-sonnet-4-5  # or any model on your account
-source lab/env.sh
 ```
 
 No `ANTHROPIC_BASE_URL` needed -- Claude Code uses the Anthropic API by default.
 
-## Stage 1: See the scaling problem
-
-From the **repo root**, reset the workspace and start with the naive (30 eager tools) MCP config:
+Wire up Snowflake and dbt:
 
 ```bash
-# repo root
+source lab/env.sh
+```
+
+---
+
+## Stage 1: See the scaling problem
+
+From the **repo root**, reset the workspace:
+
+```bash
 lab/reset.sh
+```
+
+Write the naive MCP config (30 eager tools):
+
+```bash
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/naive-server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
 EOF
-cd workspace && claude --setting-sources project,local
 ```
 
-You are now inside a Claude Code session (cwd: `workspace/`). Run `/mcp`. This
-server exposes 30 tool definitions at startup. Ask the agent to list the
-available data-engineering capabilities, then `/exit`.
+Start Claude Code from the workspace:
+
+```bash
+cd workspace
+claude --setting-sources project,local
+```
+
+You are now inside a Claude Code session. Run `/mcp`. This server exposes 30
+tool definitions at startup. Ask the agent to list the available data-engineering
+capabilities, then `/exit`.
 
 ## Stage 2: Run the task with the naive catalog
 
-From the **repo root** (run `cd ..` if you are still in `workspace/`):
+From the **repo root** (run `cd ..` if still in `workspace/`):
 
 ```bash
-# repo root
 lab/reset.sh
+```
+
+Write the naive MCP config:
+
+```bash
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/naive-server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
 EOF
-cd workspace && claude --setting-sources project,local
+```
+
+Start Claude Code:
+
+```bash
+cd workspace
+claude --setting-sources project,local
 ```
 
 Paste this task:
@@ -138,14 +174,17 @@ Constraints:
 - Make the smallest scoped change.
 ```
 
-After the agent finishes:
+After the agent finishes, check correctness and cost:
 
 ```
 /correctness --exchange-rate-settlement-date
+```
+
+```
 /cost
 ```
 
-Record the correctness and cost. `/exit`.
+Record the results, then `/exit`.
 
 ## Stage 3: Understand and apply the efficiency levers
 
@@ -165,20 +204,27 @@ The full catalog lives in `tools/catalog.js` (30 entries, 8 categories). The
 client loads two tool definitions. The agent calls `search_tools` first to find
 what it needs, then `invoke_tool` to run it.
 
-**Try it.** `/exit` the current session, then from the **repo root** (`cd ..`),
-switch to the efficient server and start a new session:
+**Try it.** Write the efficient MCP config:
 
 ```bash
-cd ..   # back to repo root
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
 EOF
-cd workspace && claude --setting-sources project,local
+```
+
+Start Claude Code:
+
+```bash
+cd workspace
+claude --setting-sources project,local
 ```
 
 Run `/mcp`. Now there are only two tools (`search_tools` and `invoke_tool`),
 yet the same 30-capability catalog is available. Ask the agent:
-`Search the MCP tool catalog for "dbt"`
+
+```
+Search the MCP tool catalog for "dbt"
+```
 
 ### Lever 2: Output compaction (lossless compression)
 
@@ -205,7 +251,8 @@ export function compactResult(columns, rows) {
 }
 ```
 
-**Try it.** Ask the agent:
+**Try it.** In the same Claude Code session, ask:
+
 ```
 Run this SQL: SELECT 'USD' AS TO_CURRENCY, FROM_CURRENCY, RATE FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES WHERE RATE_DATE = '2024-01-02' LIMIT 10
 ```
@@ -238,7 +285,8 @@ When offloading triggers, the model gets: column names, the constant-column
 preamble, 5 rows of compacted TSV, the artifact filepath, and `truncated: true`.
 The full result is preserved on disk but never enters context.
 
-**Try it.** Ask the agent:
+**Try it.** In the same session, ask:
+
 ```
 Run this SQL: SELECT * FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES
 ```
@@ -249,17 +297,27 @@ only ~900 characters entered context.
 
 `/exit` when done exploring.
 
-### Run the full task
+### Run the full task with the efficient catalog
 
-`/exit` the interactive session, then from the **repo root** (`cd ..` if needed):
+From the **repo root** (`cd ..`):
 
 ```bash
-# repo root
 lab/reset.sh
+```
+
+Write the efficient MCP config:
+
+```bash
 cat > workspace/.mcp.json <<EOF
 {"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
 EOF
-cd workspace && claude --setting-sources project,local
+```
+
+Start Claude Code:
+
+```bash
+cd workspace
+claude --setting-sources project,local
 ```
 
 Paste the same task as Stage 2:
@@ -300,10 +358,17 @@ After the agent finishes:
 
 ```
 /correctness --exchange-rate-settlement-date
+```
+
+```
 /cost
 ```
 
-Check offloaded files: `ls .tool-results/`
+Check offloaded files:
+
+```bash
+ls .tool-results/
+```
 
 ## Expected results
 
@@ -403,4 +468,4 @@ which supports both Snowflake and DuckDB.
 | the agent cannot authenticate to Snowflake | you did not `source lab/env.sh` before launching |
 | `/correctness` says FACT_REVENUE is not built | the agent never completed a successful dbt build |
 | the reset counts are not 9456 / 1973 / 13242 | the source data is wrong; run `setup/verify_setup.sh` |
-| `Auth conflict` | you launched without `--setting-sources project,local` |
+| `Auth conflict` | you launched without `--setting-sources project,local`, or both `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_API_KEY` are set |
