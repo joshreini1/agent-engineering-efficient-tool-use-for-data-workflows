@@ -91,20 +91,6 @@ You are now inside a Claude Code session (cwd: `workspace/`). Run `/mcp`. This
 server exposes 30 tool definitions at startup. Ask the agent to list the
 available data-engineering capabilities, then `/exit`.
 
-Back in the terminal (cwd: `workspace/`), return to the repo root and switch to
-the efficient catalog:
-
-```bash
-cd ..   # back to repo root
-cat > workspace/.mcp.json <<EOF
-{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
-EOF
-cd workspace && claude --setting-sources project,local
-```
-
-Run `/mcp` again. Two tools (`search_tools` and `invoke_tool`), same 30-capability
-catalog. This is **lever 1: tool search**. `/exit`.
-
 ## Stage 2: Run the task with the naive catalog
 
 From the **repo root** (run `cd ..` if you are still in `workspace/`):
@@ -164,18 +150,7 @@ Record the correctness and cost. `/exit`.
 ## Stage 3: Understand and apply the efficiency levers
 
 This stage walks through each lever's code, then lets you test it interactively.
-Start from the **repo root** (run `cd ..` if still in `workspace/`):
-
-```bash
-# repo root
-lab/reset.sh
-cat > workspace/.mcp.json <<EOF
-{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
-EOF
-cd workspace && claude --setting-sources project,local
-```
-
-You are now inside a Claude Code session (cwd: `workspace/`).
+Start from the **repo root** (run `cd ..` if still in `workspace/`).
 
 ### Lever 1: Tool search (deferred discovery)
 
@@ -190,10 +165,20 @@ The full catalog lives in `tools/catalog.js` (30 entries, 8 categories). The
 client loads two tool definitions. The agent calls `search_tools` first to find
 what it needs, then `invoke_tool` to run it.
 
-**Try it.** Ask the agent: `Search the MCP tool catalog for "dbt"`
+**Try it.** `/exit` the current session, then from the **repo root** (`cd ..`),
+switch to the efficient server and start a new session:
 
-Run `/mcp` to confirm only two tools are registered, yet the agent can discover
-all 30.
+```bash
+cd ..   # back to repo root
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+Run `/mcp`. Now there are only two tools (`search_tools` and `invoke_tool`),
+yet the same 30-capability catalog is available. Ask the agent:
+`Search the MCP tool catalog for "dbt"`
 
 ### Lever 2: Output compaction (lossless compression)
 
