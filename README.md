@@ -163,8 +163,19 @@ Record the correctness and cost. `/exit`.
 
 ## Stage 3: Understand and apply the efficiency levers
 
-This stage is a code walkthrough followed by interactive demos. Start by reading
-the source files from the **repo root** (run `cd ..` if still in `workspace/`).
+This stage walks through each lever's code, then lets you test it interactively.
+Start from the **repo root** (run `cd ..` if still in `workspace/`):
+
+```bash
+# repo root
+lab/reset.sh
+cat > workspace/.mcp.json <<EOF
+{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
+EOF
+cd workspace && claude --setting-sources project,local
+```
+
+You are now inside a Claude Code session (cwd: `workspace/`).
 
 ### Lever 1: Tool search (deferred discovery)
 
@@ -179,10 +190,15 @@ The full catalog lives in `tools/catalog.js` (30 entries, 8 categories). The
 client loads two tool definitions. The agent calls `search_tools` first to find
 what it needs, then `invoke_tool` to run it.
 
+**Try it.** Ask the agent: `Search the MCP tool catalog for "dbt"`
+
+Run `/mcp` to confirm only two tools are registered, yet the agent can discover
+all 30.
+
 ### Lever 2: Output compaction (lossless compression)
 
-Open `tools/lib.js` and find `compactResult`. Both levers are applied automatically
-inside `executeQuery`:
+Open `tools/lib.js` and find `compactResult`. Both output levers are applied
+automatically inside `executeQuery`:
 
 ```javascript
 export async function executeQuery(sql, options = {}) {
@@ -204,6 +220,20 @@ export function compactResult(columns, rows) {
 }
 ```
 
+**Try it.** Ask the agent:
+```
+Run this SQL: SELECT 'USD' AS TO_CURRENCY, FROM_CURRENCY, RATE FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES WHERE RATE_DATE = '2024-01-02' LIMIT 10
+```
+
+Expand the tool result (ctrl+o in Claude Code). Look for `"preamble":
+{"TO_CURRENCY": "USD"}` and a TSV body with only FROM_CURRENCY and RATE -- the
+constant column is stated once and removed from the rows.
+
+Note: the compaction saves tokens in the **tool result that enters context**, not
+in the model's final response. The model reads the compact form, reasons over it,
+and may re-render it however it wants (e.g. as a Markdown table). The savings are
+in what the model pays to read, not what it displays.
+
 ### Lever 3: Intermediate result offloading
 
 `offloadLargeResult` decides whether the full result fits inline (up to 20 rows /
@@ -219,34 +249,20 @@ export async function offloadLargeResult(sql, rows, columns, rawChars) {
 }
 ```
 
-### Try each lever interactively
+When offloading triggers, the model gets: column names, the constant-column
+preamble, 5 rows of compacted TSV, the artifact filepath, and `truncated: true`.
+The full result is preserved on disk but never enters context.
 
-From the **repo root**:
-
-```bash
-# repo root
-lab/reset.sh
-cat > workspace/.mcp.json <<EOF
-{"mcpServers":{"data":{"type":"stdio","command":"node","args":["$PWD/tools/server.js"],"env":{"SNOWFLAKE_CONNECTION":"$SNOWFLAKE_CONNECTION","SNOWFLAKE_ROLE":"DLAI_LAB_RL","SNOWFLAKE_WAREHOUSE":"DLAI_LAB_WH","DBT_PROJECT_DIR":"$PWD/workspace"}}}}
-EOF
-cd workspace && claude --setting-sources project,local
-```
-
-**Lever 1 -- tool search.** Ask: `Search the MCP tool catalog for "dbt"`
-
-**Lever 2 -- output compaction.** Ask:
-```
-Run this SQL: SELECT 'USD' AS TO_CURRENCY, FROM_CURRENCY, RATE FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES WHERE RATE_DATE = '2024-01-02' LIMIT 10
-```
-Look for the `preamble` (TO_CURRENCY stated once) and TSV body (no padding).
-
-**Lever 3 -- result offloading.** Ask:
+**Try it.** Ask the agent:
 ```
 Run this SQL: SELECT * FROM DLAI_AGENT_ENGINEERING.L1_FX_SOURCE.DIM_EXCHANGE_RATES
 ```
-Look for `truncated: true`, 5-row preview, and the `.tool-results/` artifact path.
 
-`/exit` when done.
+Expand the tool result. Look for `"truncated": true`, a 5-row preview, and the
+`.tool-results/query-*.json` artifact path. The full 13,242 rows are on disk;
+only ~900 characters entered context.
+
+`/exit` when done exploring.
 
 ### Run the full task
 
