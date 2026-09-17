@@ -55,8 +55,8 @@ export SNOWFLAKE_ACCOUNT=<your-account>
 export SNOWFLAKE_USER=<your-user>
 export SNOWFLAKE_CONNECTION=<your-snow-cli-connection>
 export ANTHROPIC_BASE_URL="https://<account-url>.snowflakecomputing.com/api/v2/cortex"
-export ANTHROPIC_API_KEY=<your Snowflake Cortex PAT>
-export ANTHROPIC_AUTH_TOKEN="$ANTHROPIC_API_KEY"
+export ANTHROPIC_AUTH_TOKEN=<your Snowflake Cortex PAT>
+unset ANTHROPIC_API_KEY   # avoid "Auth conflict" warning in Claude Code
 export ANTHROPIC_MODEL=claude-opus-4-6
 source lab/env.sh
 ```
