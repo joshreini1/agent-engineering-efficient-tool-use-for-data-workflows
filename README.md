@@ -35,8 +35,12 @@ the conversation starts. Only 2-3 tools are needed for any given task.
 
 ## One-time setup
 
-All commands below assume you are in the **repo root** (the directory containing
-`tools/`, `lab/`, `workspace/`, etc.).
+```bash
+git clone https://github.com/joshreini1/agent-engineering-efficient-tool-use-for-data-workflows.git
+cd agent-engineering-efficient-tool-use-for-data-workflows
+```
+
+All commands below assume you are in this **repo root** directory.
 
 ```bash
 npm install --prefix tools
