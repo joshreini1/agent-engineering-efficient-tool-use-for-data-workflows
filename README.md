@@ -36,12 +36,10 @@ the conversation starts. Only 2-3 tools are needed for any given task.
 ## One-time setup
 
 ```bash
-# 1. Install MCP server dependencies
 npm install --prefix tools
-
-# 2. Set your credentials
-source lab/env.sh
 ```
+
+Then set your credentials and wire up the environment. Pick Option A or B.
 
 ### Option A: Snowflake Cortex (model + data)
 
@@ -68,7 +66,6 @@ source lab/env.sh
 ```
 
 No `ANTHROPIC_BASE_URL` needed -- Claude Code uses the Anthropic API by default.
-```
 
 ## Stage 1: See the scaling problem
 
